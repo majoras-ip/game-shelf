@@ -31,6 +31,8 @@ A console-style launcher for emulated games on macOS. Your games sit as case spi
 
 Emulators are found in an `Emulators` folder next to your games, or in `/Applications`.
 
+**PS3 firmware:** put Sony's `PS3UPDAT.PUP` in `Emulators/_installers/` and the shelf installs it into RPCS3 automatically on its next launch (one time), so you don't need RPCS3's file picker.
+
 ## Setup
 
 1. Make a games folder (for example `~/Dolphin Games`) and copy `Game Shelf/` and `Game Shelf.app` into it.

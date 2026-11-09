@@ -5,6 +5,8 @@ Game Shelf/backgrounds/
 Game Shelf/recordings/
 Game Shelf/state.json
 Game Shelf/*.log
+Game Shelf/.rpcs3_firmware_installed
+Game Shelf/errors.log
 Game Shelf/*.backup*
 Game Shelf/.*.jpg
 Game Shelf/.*.png

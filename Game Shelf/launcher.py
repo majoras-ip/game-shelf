@@ -122,6 +122,8 @@ def save_state(state):
 
 def clean_title(stem):
     title = re.sub(r"\s*[\(\[][^\)\]]*[\)\]]", "", stem).strip()
+    # "Legend of Zelda, The - The Wind Waker" -> "The Legend of Zelda - The Wind Waker"
+    title = re.sub(r"^(.+?), (The|A|An)(?=$| - )", r"\2 \1", title)
     return title or stem
 
 
@@ -553,6 +555,27 @@ def launch_other(path, system):
     return None
 
 
+def install_rpcs3_firmware_once():
+    """If a PS3UPDAT.PUP is waiting in Emulators/_installers, install it into RPCS3 one time."""
+    pup = EMU_DIR / "_installers" / "PS3UPDAT.PUP"
+    done = HERE / ".rpcs3_firmware_installed"
+    if not pup.exists() or done.exists():
+        return
+    app = find_app(EMULATORS["rpcs3"]["apps"])
+    binary = app_binary(app) if app else None
+    if not binary:
+        return
+    def run():
+        try:
+            with open(HERE / "rpcs3_firmware.log", "w") as log:
+                r = subprocess.run([str(binary), "--installfw", str(pup)], stdout=log, stderr=subprocess.STDOUT, timeout=900)
+            if r.returncode == 0:
+                done.write_text(time.strftime("%Y-%m-%d %H:%M:%S"))
+        except Exception as e:
+            log_error(f"RPCS3 firmware install failed: {e!r}")
+    threading.Thread(target=run, daemon=True).start()
+
+
 def launch(path, state=None):
     app = find_dolphin()
     if app is None:
@@ -766,6 +789,7 @@ def main():
         print("Couldn't find a free port between 8642 and 8661.")
         sys.exit(1)
     url = f"http://127.0.0.1:{PORT}/"
+    install_rpcs3_firmware_once()
     for sysname, info in SYSTEMS.items():
         if info["emu"] == "dolphin":
             continue
