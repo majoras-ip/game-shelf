@@ -46,3 +46,5 @@ Game Shelf.app/Contents/MacOS/ShelfWindow.tmp
 Emulators/
 
 .DS_Store
+
+Game Shelf/.detect_cache.json

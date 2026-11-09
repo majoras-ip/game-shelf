@@ -100,6 +100,7 @@ body.ingame .glow{filter:none;opacity:0}
 .resume small{font-weight:400;color:var(--muted);font-size:13px}
 .btn-x{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#3a6fe0;color:#fff;font-size:13px;font-weight:800}
 .ctl{display:flex;align-items:center;gap:10px;margin-top:22px;color:var(--muted);font-size:14px}
+.ctl[hidden]{display:none}
 .ctl select{font:inherit;font-size:14px;color:var(--ink);background:rgba(244,241,255,.09);border:1.5px solid rgba(244,241,255,.2);border-radius:10px;padding:6px 10px;max-width:260px}
 .ctl select:focus-visible{outline:3px solid var(--b);outline-offset:2px}
 .newlayout{margin-top:14px;padding:16px;border-radius:14px;background:rgba(244,241,255,.07);border:1.5px solid rgba(244,241,255,.16);max-width:460px;display:grid;gap:12px}
@@ -121,6 +122,13 @@ body.ingame .glow{filter:none;opacity:0}
 .lightbox.on{display:grid}
 .lightbox img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 30px 60px #000a}
 .lightbox p{position:fixed;bottom:18px;left:0;right:0;text-align:center;color:var(--muted);font-size:14px;margin:0}
+.toasts{position:fixed;right:20px;bottom:44px;z-index:25;display:grid;gap:8px;max-width:340px}
+.toast{background:rgba(15,12,35,.92);border:1.5px solid rgba(244,241,255,.18);border-radius:12px;padding:10px 14px;font-size:14px;color:var(--ink);box-shadow:0 10px 30px #0008}
+.toast b{display:block;font-weight:700;margin-bottom:2px}
+.toast.running b::after{content:'';display:inline-block;width:10px;height:10px;margin-left:8px;border-radius:50%;border:2px solid var(--b);border-right-color:transparent;animation:spin 1s linear infinite;vertical-align:-1px}
+.toast.error{border-color:#ff9a9a}
+.fixbtn{font:inherit;font-weight:700;font-size:14px;margin-left:10px;padding:5px 14px;border-radius:999px;border:0;background:var(--b);color:var(--room-deep);cursor:pointer}
+.fixbtn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){body.launching .art{transform:none}.art,.info{transition:opacity .15s}.art.to-left,.art.to-right,.info.to-left,.info.to-right{transform:none}.disc.roll-r svg,.disc.roll-l svg{animation:none}.disc svg,.disc.pop{animation:none}.spine,.disc,.glow{transition:none}}
 @media (max-width:760px){
   body{overflow:auto}
@@ -140,6 +148,7 @@ body.ingame .glow{filter:none;opacity:0}
 <iframe class="yt" id="yt" title="Background video" tabindex="-1" aria-hidden="true" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe>
 <div class="shade" id="shade" aria-hidden="true"></div>
 <div class="veil" aria-hidden="true"></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 <div class="lightbox" id="lightbox" role="dialog" aria-label="Screenshot"><img id="lbimg" alt=""><p>Left and right for more. B or Esc to close.</p></div>
 <div class="app">
   <header>
@@ -435,7 +444,7 @@ function infoHTML(g){
   const resume = g.resume ? `<button class="resume" id="resume"><span class="btn-x">X</span>Resume <small>saved ${ago(g.resume.time).replace('Played ', '').replace('Not played yet', '')}</small></button>` : '';
   return `
     <h1>${esc(g.title)}</h1>
-    <div class="meta"><span class="tag">${esc(g.system)}</span><span>${sizeText(g.size)} ${esc(g.format)}</span><span>${ago(g.lastPlayed)}</span></div>
+    <div class="meta"><span class="tag">${esc(g.system)}</span><span>${g.size ? sizeText(g.size) + ' ' : ''}${esc(g.format)}</span><span>${ago(g.lastPlayed)}</span></div>
     <div class="actions"><button class="play" id="play"><span class="btn-a">A</span>Play</button>${resume}</div>
     <div class="status" id="status" role="status"></div>
     <label class="ctl" ${g.profileKind ? '' : 'hidden'}>Controller <select id="prof" aria-label="Controller layout for this game"><option value="">Dolphin default</option></select></label>
@@ -463,7 +472,7 @@ const PRESET_DESC = {
   current: 'Saves exactly what you have set up in Dolphin’s Controllers window right now.'
 };
 async function fillProfiles(g, force){
-  const sel = $('#prof'); if (!sel) return;
+  const sel = $('#prof'); if (!sel || !g.profileKind) return;
   try {
     if (force || !profCache[g.profileKind]) profCache[g.profileKind] = (await (await fetch('/api/profiles?kind=' + g.profileKind)).json()).profiles || [];
   } catch (e) { profCache[g.profileKind] = []; }
@@ -558,7 +567,20 @@ function showEmpty(){
       : 'Put GameCube and Wii games in your Dolphin Games folder, and other systems in their folders (NES, SNES, N64, PS1, PS2, PSP, Xbox and so on), then press R.'}</p></div>`;
 }
 
-function showStatus(msg, err){ const s = $('#status'); if (s) { s.textContent = msg; s.classList.toggle('err', !!err); } }
+function showStatus(msg, err, fix){
+  const s = $('#status'); if (!s) return;
+  s.textContent = msg; s.classList.toggle('err', !!err);
+  if (fix) {
+    const b = document.createElement('button'); b.className = 'fixbtn'; b.textContent = fix.label || 'Fix it';
+    b.onclick = async () => {
+      b.disabled = true;
+      try { await fetch('/api/fix', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(fix)}); pollChanges(); }
+      catch (e) {}
+      s.textContent = 'Working on it. You can keep browsing.'; s.classList.remove('err');
+    };
+    s.appendChild(b);
+  }
+}
 
 async function load(){
   const keep = view[index]?.file;
@@ -588,6 +610,12 @@ let launched = false;
 async function play(resume){
   const g = view[index]; if (!g || busy) return;
   if (resume && !g.resume) return;
+  if (g.emu && g.emu !== 'dolphin') {
+    try {
+      const c = await (await fetch('/api/check?file=' + encodeURIComponent(g.file))).json();
+      if (!c.ok) { showStatus(c.error, true, c.fix); return; }
+    } catch (e) {}
+  }
   busy = true; const btn = $('#play'); if (btn) btn.disabled = true;
   document.body.classList.remove('returning');
   document.body.classList.add('launching');
@@ -597,13 +625,13 @@ async function play(resume){
   try {
     const r = await fetch('/api/launch', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({file: g.file, resume: !!resume})});
     const d = await r.json();
-    if (!r.ok) throw new Error(d.error || "Dolphin didn't start.");
+    if (!r.ok) { const err = new Error(d.error || "The game didn't start."); err.fix = d.fix; throw err; }
     g.lastPlayed = d.lastPlayed; g.plays = d.plays;
     launched = true;
     setTimeout(() => { if (launched && document.hasFocus()) comeBack(); }, 8000);
   } catch (e) {
     comeBack();
-    showStatus(e.message || "Dolphin didn't start.", true);
+    showStatus(e.message || "The game didn't start.", true, e.fix);
   } finally {
     busy = false; const b = $('#play'); if (b) b.disabled = false;
   }
@@ -698,6 +726,21 @@ setInterval(() => {
   if (v.paused && !b.paused) b.pause();
   else if (!v.paused) { if (b.paused) b.play().catch(() => {}); if (Math.abs(b.currentTime - v.currentTime) > 0.3) b.currentTime = v.currentTime; }
 }, 400);
+let lastSig = null, shownJobs = {};
+async function pollChanges(){
+  if (document.body.classList.contains('launching')) return;
+  try {
+    const d = await (await fetch('/api/changes', {cache: 'no-store'})).json();
+    if (lastSig && d.sig !== lastSig && !busy) load();
+    lastSig = d.sig;
+    const box = $('#toasts');
+    box.innerHTML = (d.jobs || []).map(j => `<div class="toast ${j.state}"><b>${esc(j.title)}</b>${esc(j.msg || '')}</div>`).join('');
+    for (const j of d.jobs || []) {
+      if (j.state === 'done' && !shownJobs[j.id]) { shownJobs[j.id] = 1; load(); }
+    }
+  } catch (e) {}
+}
+setInterval(pollChanges, 3000); pollChanges();
 const unlock = () => { const v = $('#bgv'); if (!v.src || document.body.classList.contains('launching')) return; if (v.paused) startVideo(v); else if (soundOn && v.muted) { v.muted = false; v.volume = 0; fadeVolume(v, VOL, 500); } };
 addEventListener('pointerdown', unlock); addEventListener('keydown', unlock);
 load();

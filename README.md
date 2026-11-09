@@ -58,6 +58,17 @@ Dolphin Games/
 
 Name covers, discs and backgrounds after the game title as shown on the shelf.
 
+### Drop in and play
+
+New games show up on the shelf by themselves, and the shelf takes care of the usual hassles:
+
+- **Wrong folder?** Disc images are checked inside, so a PS2 game in the Wii U folder still launches in PCSX2.
+- **Zipped download?** `.zip`, `.7z` and `.rar` files for disc-based systems are unpacked automatically and the archive goes to the Trash.
+- **PS3 `.pkg`?** It's installed into RPCS3 (with any `.rap` license next to it) and appears on the shelf.
+- **PS1 `.bin` with no `.cue`?** The missing `.cue` is written for you.
+- **Wii U game folders** (`code`, `content`, `meta`) work as-is; update and DLC folders are skipped.
+- **Missing BIOS, firmware or RetroArch core?** You get a clear message instead of a black screen, and missing RetroArch cores can be downloaded from libretro with one click.
+
 ## Controls
 
 | Action | Controller | Keyboard |

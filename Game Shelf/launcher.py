@@ -12,6 +12,8 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import intake
+
 HERE = Path(__file__).resolve().parent
 GAMES_DIR = HERE.parent
 STATE_FILE = HERE / "state.json"
@@ -62,32 +64,96 @@ def folder_system(name):
     return None
 
 
+DISC_SYSTEMS = {"GameCube", "Wii", "PS1", "PS2", "PS3", "PSP", "Xbox"}
+SNIFF_EXTS = {".iso", ".gcm", ".bin", ".img"}
+
+
+def _route(f, folder_sys):
+    """Folder says one thing, but a disc image knows what it really is."""
+    ext = f.suffix.lower()
+    if ext in SNIFF_EXTS or (ext == ".ciso" and folder_sys not in ("PSP",)):
+        found = intake.detect_disc(f)
+        if found:
+            return found
+    return folder_sys
+
+
 def game_files():
-    """Yield (path, system) for every game: Dolphin games in the main folder, others in system subfolders."""
+    """Yield (path, system) for every game, wherever it was dropped."""
     for p in sorted(GAMES_DIR.iterdir(), key=lambda x: x.name.lower()):
         if p.name.startswith(".") or p.name in (HERE.name, "Emulators"):
             continue
-        if p.is_file() and p.suffix.lower() in EXTS:
-            yield p, None
+        if p.is_file():
+            ext = p.suffix.lower()
+            if ext in EXTS:
+                real = _route(p, None)
+                yield p, (real if real not in (None, "GameCube", "Wii") else None)
+            elif ext in SNIFF_EXTS | {".cue", ".chd", ".cso", ".pbp", ".wua", ".wux", ".wud", ".xiso"}:
+                real = _route(p, None)
+                if not real:
+                    real = {".wua": "Wii U", ".wux": "Wii U", ".wud": "Wii U", ".cue": "PS1", ".pbp": "PSP", ".xiso": "Xbox"}.get(ext)
+                if real:
+                    yield p, real
         elif p.is_dir():
+            if is_ps3_folder(p):
+                yield p, "PS3"
+                continue
+            if intake.is_wiiu_folder(p) and intake.wiiu_kind(p) == "game":
+                yield p, "Wii U"
+                continue
             sysname = folder_system(p.name)
             if not sysname:
                 continue
-            if SYSTEMS[sysname].get("dirs"):
-                for d in sorted(p.iterdir(), key=lambda x: x.name.lower()):
-                    if not d.name.startswith(".") and is_ps3_folder(d):
-                        yield d, sysname
+            for d in sorted(p.iterdir(), key=lambda x: x.name.lower()):
+                if d.name.startswith(".") or not d.is_dir():
+                    continue
+                if is_ps3_folder(d):
+                    yield d, "PS3"
+                elif intake.is_wiiu_folder(d) and intake.wiiu_kind(d) == "game":
+                    yield d, "Wii U"
             files = sorted((f for f in p.iterdir() if f.is_file() and not f.name.startswith(".")), key=lambda x: x.name.lower())
             stems_with_cue = {f.stem.lower() for f in files if f.suffix.lower() in (".cue", ".m3u")}
             for f in files:
                 ext = f.suffix.lower()
-                if ext not in SYSTEMS[sysname]["exts"]:
+                if ext not in ALL_EXTS:
                     continue
-                if ext in (".bin", ".iso") and sysname == "PS1" and f.stem.lower() in stems_with_cue:
-                    continue  # the .cue sheet stands for its .bin tracks
-                if ext == ".bin" and sysname != "Genesis":
+                if ext in (".bin", ".img") and sysname != "Genesis":
+                    continue  # raw tracks are reached through their .cue sheet
+                if ext == ".iso" and sysname == "PS1" and f.stem.lower() in stems_with_cue:
                     continue
-                yield f, sysname
+                real = _route(f, sysname) if sysname in DISC_SYSTEMS or ext in SNIFF_EXTS else sysname
+                if ext not in SYSTEMS.get(real, {}).get("exts", set()) and real == sysname:
+                    continue
+                yield f, real
+    for d, _title in intake.installed_ps3_games():
+        yield d, "PS3"
+
+
+def resolve_game(name):
+    """Turn a shelf file name back into a real path (games can also live inside RPCS3)."""
+    if name.startswith("@ps3/"):
+        p = intake.RPCS3_HDD_GAMES / name.split("/", 1)[1]
+        return p if p.is_dir() and p.parent == intake.RPCS3_HDD_GAMES else None
+    try:
+        p = (GAMES_DIR / name).resolve()
+        p.relative_to(GAMES_DIR.resolve())
+    except (ValueError, OSError):
+        return None
+    return p if p.exists() else None
+
+
+def game_title(p, system):
+    if system == "PS3" and p.is_dir():
+        t = intake.ps3_title(p)
+        if t:
+            return t
+    if system == "Wii U" and p.is_dir():
+        t = intake.wiiu_meta(p).get("title")
+        if t:
+            return t
+    return clean_title(p.name if p.is_dir() else p.stem)
+
+
 WII_MAGIC = 0x5D1C9EA3
 GC_MAGIC = 0xC2339F3D
 COVER_DIRS = [
@@ -222,14 +288,11 @@ def find_background(path, title, gid):
 
 
 def media_for(name):
-    try:
-        p = (GAMES_DIR / name).resolve()
-        p.relative_to(GAMES_DIR.resolve())
-    except (ValueError, OSError):
+    p = resolve_game(name)
+    if p is None or HERE.resolve() in p.parents:
         return None, None, None
-    if HERE.resolve() in p.parents or not (p.is_file() and p.suffix.lower() in ALL_EXTS or is_ps3_folder(p)):
-        return None, None, None
-    title, gid = clean_title(p.name if p.is_dir() else p.stem), (read_game_id(p) if p.is_file() else None)
+    title = game_title(p, "PS3" if is_ps3_folder(p) or p.parent == intake.RPCS3_HDD_GAMES else "Wii U" if intake.is_wiiu_folder(p) else None)
+    gid = read_game_id(p) if p.is_file() else None
     return find_cover(p, title, gid), find_background(p, title, gid), find_disc(p, title, gid)
 
 
@@ -238,13 +301,13 @@ def scan():
     games = []
     for p, sysname in game_files():
       try:
-        rel = p.relative_to(GAMES_DIR).as_posix()
+        rel = ("@ps3/" + p.name) if p.parent == intake.RPCS3_HDD_GAMES else p.relative_to(GAMES_DIR).as_posix()
         dolphin = sysname in (None, "GameCube", "Wii")
         system = detect_system(p) if sysname is None else sysname
         if sysname in ("GameCube", "Wii") and p.suffix.lower() in (".iso", ".ciso", ".gcm"):
             system = detect_system(p)
         info = state.get(rel, state.get(p.name, {})) if sysname is None else state.get(rel, {})
-        title = clean_title(p.name if p.is_dir() else p.stem)
+        title = game_title(p, system)
         gid = read_game_id(p) if dolphin else None
         q = urllib.parse.quote(rel)
         cover, bg, disc = find_cover(p, title, gid), find_background(p, title, gid), find_disc(p, title, gid)
@@ -533,7 +596,19 @@ def emulator_command(emu, path):
 
 
 def launch_other(path, system):
+    """Returns None on success, or (message, fix) / message on failure."""
     emu = SYSTEMS[system]["emu"]
+    core = RA_CORES / (SYSTEMS[system]["core"] + ".dylib") if emu == "retroarch" else None
+    msg, fix = intake.preflight(system, core)
+    if msg:
+        return (msg, fix)
+    if system == "Wii U" and path.is_dir():
+        rpx = intake.wiiu_rpx(path)
+        if not rpx:
+            return "This Wii U game folder is missing its code/*.rpx file."
+        path = rpx
+    if system == "PS3" and path.parent == intake.RPCS3_HDD_GAMES:
+        path = path / "USRDIR" / "EBOOT.BIN"
     if emu == "retroarch":
         app = find_app(EMULATORS["retroarch"]["apps"])
         binary = app_binary(app) if app else None
@@ -693,6 +768,16 @@ class Handler(BaseHTTPRequestHandler):
             if kind not in ("GCPad", "Wiimote"):
                 return self.send_json(400, {"error": "Bad kind"})
             self.send_json(200, {"profiles": list_profiles(kind)})
+        elif url.path == "/api/check":
+            g = self._game(urllib.parse.parse_qs(url.query).get("file", [""])[0])
+            if not g or g.get("emu", "dolphin") == "dolphin":
+                return self.send_json(200, {"ok": True})
+            info = SYSTEMS.get(g["system"], {})
+            core = RA_CORES / (info["core"] + ".dylib") if info.get("emu") == "retroarch" else None
+            msg, fix = intake.preflight(g["system"], core)
+            self.send_json(200, {"ok": not msg, "error": msg, "fix": fix})
+        elif url.path == "/api/changes":
+            self.send_json(200, {"sig": intake.folders_signature(GAMES_DIR, folder_system), "jobs": intake.jobs_snapshot()})
         elif self.path == "/api/games":
             self.send_json(200, {"games": scan(), "folder": GAMES_DIR.name})
         else:
@@ -702,7 +787,7 @@ class Handler(BaseHTTPRequestHandler):
         return next((g for g in scan() if g["file"] == name), None)
 
     def do_POST(self):
-        if self.path not in ("/api/launch", "/api/profile", "/api/profile/new"):
+        if self.path not in ("/api/launch", "/api/profile", "/api/profile/new", "/api/fix"):
             return self.send_json(404, {"error": "Not found"})
         origin = self.headers.get("Origin")
         if origin not in (None, f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"):
@@ -712,6 +797,11 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             return self.send_json(400, {"error": "Bad request."})
+        if self.path == "/api/fix":
+            if data.get("action") == "core" and data.get("system") in SYSTEMS and SYSTEMS[data["system"]].get("core"):
+                intake.download_core(SYSTEMS[data["system"]]["core"], RA_CORES, data["system"])
+                return self.send_json(200, {"ok": True})
+            return self.send_json(400, {"error": "Unknown fix."})
         name = data.get("file", "")
         game = self._game(name)
         if not game:
@@ -749,12 +839,16 @@ class Handler(BaseHTTPRequestHandler):
         state = latest_state(game["id"]) if data.get("resume") else None
         if data.get("resume") and not state:
             return self.send_json(404, {"error": "There's no save state for this game yet."})
+        path = resolve_game(name)
+        if path is None:
+            return self.send_json(404, {"error": "That game isn't in the folder anymore."})
         if game.get("emu", "dolphin") == "dolphin":
-            error = launch(GAMES_DIR / name, state)
+            error = launch(path, state)
         else:
-            error = launch_other(GAMES_DIR / name, game["system"])
+            error = launch_other(path, game["system"])
         if error:
-            return self.send_json(500, {"error": error})
+            msg, fix = error if isinstance(error, tuple) else (error, None)
+            return self.send_json(409, {"error": msg, "fix": fix})
         global LAST_SEEN
         LAST_SEEN = time.time() + 3600  # give long play sessions a buffer
         with _lock:
@@ -790,6 +884,8 @@ def main():
         sys.exit(1)
     url = f"http://127.0.0.1:{PORT}/"
     install_rpcs3_firmware_once()
+    intake.init_cache(HERE / ".detect_cache.json")
+    intake.start(GAMES_DIR, folder_system, find_app, app_binary, log_error)
     for sysname, info in SYSTEMS.items():
         if info["emu"] == "dolphin":
             continue
