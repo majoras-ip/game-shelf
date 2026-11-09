@@ -1,0 +1,34 @@
+#!/bin/bash
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+CONTENTS="$(cd "$HERE/.." && pwd)"
+APPDIR="$(cd "$CONTENTS/.." && pwd)"
+DIR=""
+for d in "$(dirname "$APPDIR")/Game Shelf" "$HOME/Dolphin Games/Game Shelf" "$HOME/Desktop/Dolphin Games/Game Shelf"; do
+  if [ -f "$d/launcher.py" ]; then DIR="$d"; break; fi
+done
+if [ -z "$DIR" ]; then
+  osascript -e 'display alert "Game Shelf files not found" message "Keep Game Shelf.app and the Game Shelf folder together inside your Dolphin Games folder."'
+  exit 1
+fi
+
+BIN="$HERE/ShelfWindow"
+SRC="$CONTENTS/Resources/ShelfWindow.swift"
+if [ ! -x "$BIN" ] || [ "$SRC" -nt "$BIN" ]; then
+  osascript -e 'display notification "Setting up the Game Shelf window. This only happens once and takes about 30 seconds." with title "Game Shelf"' >/dev/null 2>&1 &
+  ( xcrun swiftc -O "$SRC" -o "$BIN.tmp" -framework Cocoa -framework WebKit > "$DIR/build.log" 2>&1 && mv -f "$BIN.tmp" "$BIN" ) &
+  BUILD=$!
+  for i in $(seq 1 120); do kill -0 $BUILD 2>/dev/null || break; sleep 1; done
+  kill $BUILD 2>/dev/null
+  touch "$BIN" 2>/dev/null
+  # macOS often won't show a window for a freshly built app in the same launch, so start it again cleanly.
+  if [ -x "$BIN" ]; then ( sleep 1; open "$APPDIR" ) >/dev/null 2>&1 & exit 0; fi
+fi
+
+if [ -x "$BIN" ]; then
+  exec "$BIN" "$DIR"
+fi
+
+# Fallback: open the shelf in a browser if the window couldn't be built.
+cd "$DIR"
+nohup python3 launcher.py > "$DIR/shelf.log" 2>&1 &

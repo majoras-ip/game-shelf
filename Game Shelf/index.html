@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Shelf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+@property --a{syntax:'<color>';inherits:true;initial-value:#3b2f5e}
+@property --b{syntax:'<color>';inherits:true;initial-value:#e08a3c}
+@property --c{syntax:'<color>';inherits:true;initial-value:#f3d9b1}
+:root{
+  transition:--a .7s ease, --b .7s ease, --c .7s ease;
+  --room:#221d4a; --room-deep:#15122f; --ink:#f4f1ff; --muted:#aaa4d8; --plank:#3a3270;
+  --a:#3b2f5e; --b:#e08a3c; --c:#f3d9b1;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:linear-gradient(var(--room),var(--room-deep));color:var(--ink);font-family:"Bricolage Grotesque",ui-rounded,system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+.glow{position:fixed;width:1000px;height:1000px;left:-220px;top:-260px;border-radius:50%;background:var(--a);filter:blur(150px);opacity:.8;transition:background-color .7s ease;pointer-events:none}
+.bgv{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .9s ease;pointer-events:none}
+.bgv.on{opacity:.6}
+.bgblur{position:fixed;inset:-60px;width:calc(100% + 120px);height:calc(100% + 120px);object-fit:cover;filter:blur(40px) saturate(1.15);opacity:0;transition:opacity .9s ease;pointer-events:none}
+.bgblur.on{opacity:.35}
+.yt{position:fixed;left:50%;top:50%;width:max(100vw,177.78vh);height:max(56.25vw,100vh);transform:translate(-50%,-50%) scale(1.18);border:0;pointer-events:none;opacity:0;transition:opacity .9s ease}
+.yt.on{opacity:.55}
+.shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(21,18,47,.85) 0%,rgba(21,18,47,.35) 55%,rgba(21,18,47,.75) 100%),linear-gradient(transparent 55%,rgba(21,18,47,.95));opacity:0;transition:opacity .9s ease}
+.shade.on{opacity:1}
+.art{position:relative;display:grid;place-items:center;transition:opacity .26s ease, transform .38s cubic-bezier(.22,.9,.25,1)}
+.art.to-left{opacity:0;transform:translateX(-46%) scale(.86) rotate(-4deg)}
+.art.to-right{opacity:0;transform:translateX(46%) scale(.86) rotate(4deg)}
+.info.to-left{opacity:0;transform:translateX(-60px)}
+.info.to-right{opacity:0;transform:translateX(60px)}
+.art.snap,.info.snap{transition:none}
+.disc.roll-r svg{animation:roll-r .55s cubic-bezier(.2,.8,.2,1), spin 16s linear .55s infinite}
+.disc.roll-l svg{animation:roll-l .55s cubic-bezier(.2,.8,.2,1), spin 16s linear .55s infinite}
+@keyframes roll-r{from{transform:rotate(-200deg)}to{transform:rotate(0)}}
+@keyframes roll-l{from{transform:rotate(200deg)}to{transform:rotate(0)}}
+
+.info{transition:opacity .22s ease, transform .34s cubic-bezier(.22,.9,.25,1)}
+
+.art .case{position:relative;z-index:1;width:76%;max-width:360px;border-radius:8px;overflow:hidden;box-shadow:0 30px 50px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.12)}
+.art .case img{display:block;width:100%;height:auto}
+.art.has-cover .disc{position:absolute;width:64%;right:-10%;top:16%;z-index:0}
+.app{position:relative;display:grid;grid-template-rows:auto 1fr auto;height:100vh;padding:28px 44px 0}
+header{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.brand{font-weight:800;font-size:22px;letter-spacing:-.01em;margin:0}
+.count{color:var(--muted);font-size:15px}
+.tools{display:flex;gap:8px;margin-left:auto;align-items:center;flex-wrap:wrap}
+.chip{font:inherit;font-size:14px;color:var(--muted);background:transparent;border:1.5px solid rgba(244,241,255,.2);border-radius:999px;padding:6px 14px;cursor:pointer}
+.chip:hover{color:var(--ink)}
+.chip[aria-pressed="true"]{color:var(--room-deep);background:var(--ink);border-color:var(--ink)}
+.chip:focus-visible,.search:focus-visible{outline:3px solid var(--b);outline-offset:2px}
+.search{font:inherit;font-size:15px;color:var(--ink);background:rgba(244,241,255,.09);border:1.5px solid transparent;border-radius:999px;padding:8px 16px;width:210px}
+.search::placeholder{color:var(--muted)}
+.stage{display:grid;grid-template-columns:minmax(260px,420px) 1fr;align-items:center;gap:60px;min-height:0;padding:10px 0}
+.disc{display:grid;place-items:center;filter:drop-shadow(0 34px 44px rgba(0,0,0,.45));transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.disc.mini{transform:scale(.8)}
+.disc svg{width:100%;height:auto;display:block;animation:spin 16s linear infinite}
+.disc.pop{animation:pop .45s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pop{from{opacity:.2;translate:-40px 0}to{opacity:1;translate:0 0}}
+.info h1{font-size:clamp(44px,6.2vw,96px);line-height:.94;letter-spacing:-.035em;font-weight:800;margin:0 0 20px;max-width:12ch;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;color:var(--muted);font-size:16px;margin-bottom:32px}
+.tag{border-radius:6px;padding:3px 10px;background:var(--c);color:var(--room-deep);font-weight:600}
+.play{font:inherit;font-weight:800;font-size:20px;color:var(--room-deep);background:var(--b);border:0;border-radius:999px;padding:14px 32px 14px 14px;display:inline-flex;align-items:center;gap:14px;cursor:pointer;transition:transform .15s, background-color .7s}
+.play:hover{transform:translateY(-2px)}
+.play:active{transform:scale(.97)}
+.play:disabled{opacity:.6;cursor:wait}
+.play:focus-visible{outline:3px solid var(--ink);outline-offset:4px}
+.btn-a{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--room-deep);color:var(--b);font-size:16px}
+.status{min-height:24px;margin-top:18px;font-size:15px;color:var(--ink)}
+.status.err{color:#ffb3b3}
+.hint{color:var(--muted);font-size:14px;margin-top:6px}
+.empty h1{max-width:none}
+.spines{display:flex;gap:10px;align-items:flex-end;overflow-x:auto;padding:30px 6px 0;scrollbar-width:none}
+.spines::-webkit-scrollbar{display:none}
+.spine{flex:0 0 auto;width:58px;height:240px;border:0;border-radius:6px 6px 0 0;background:var(--sa);color:var(--sc);font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 0 12px;transition:transform .25s cubic-bezier(.2,.8,.2,1), width .25s;box-shadow:inset -7px 0 0 rgba(0,0,0,.2), inset 3px 0 0 rgba(255,255,255,.14)}
+.spine .t{writing-mode:vertical-rl;font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:200px}
+.spine .s{font-size:11px;font-weight:600;padding:2px 5px;border-radius:4px;background:var(--sb);color:var(--sa)}
+.spine[aria-selected="true"]{transform:translateY(-24px);width:70px}
+.spine:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.plank{height:24px;background:var(--plank);border-top:3px solid rgba(244,241,255,.22);margin:0 -44px}
+.pad{display:none;color:var(--muted);font-size:13px}
+.pad.on{display:inline}
+.veil{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:20;transition:opacity .6s ease}
+body.launching .veil{opacity:1;transition:opacity .75s ease .35s}
+body.launching .art{transition:transform 1.05s cubic-bezier(.65,0,.25,1), opacity .5s ease .6s;transform:translateX(38%) scale(2.7);opacity:0}
+body.launching .info,body.launching header,body.launching .spines,body.launching .plank{opacity:0;transition:opacity .3s ease}
+body.launching .disc svg{animation-duration:.9s}
+body.returning .veil{opacity:0;transition:opacity .6s ease}
+body.ingame *{animation-play-state:paused!important}
+body.ingame .glow{filter:none;opacity:0}
+.actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.resume{font:inherit;font-weight:700;font-size:17px;color:var(--ink);background:rgba(244,241,255,.12);border:1.5px solid rgba(244,241,255,.28);border-radius:999px;padding:11px 22px 11px 11px;display:inline-flex;align-items:center;gap:12px;cursor:pointer;transition:transform .15s}
+.resume:hover{transform:translateY(-2px)}
+.resume:focus-visible{outline:3px solid var(--b);outline-offset:4px}
+.resume small{font-weight:400;color:var(--muted);font-size:13px}
+.btn-x{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#3a6fe0;color:#fff;font-size:13px;font-weight:800}
+.ctl{display:flex;align-items:center;gap:10px;margin-top:22px;color:var(--muted);font-size:14px}
+.ctl select{font:inherit;font-size:14px;color:var(--ink);background:rgba(244,241,255,.09);border:1.5px solid rgba(244,241,255,.2);border-radius:10px;padding:6px 10px;max-width:260px}
+.ctl select:focus-visible{outline:3px solid var(--b);outline-offset:2px}
+.newlayout{margin-top:14px;padding:16px;border-radius:14px;background:rgba(244,241,255,.07);border:1.5px solid rgba(244,241,255,.16);max-width:460px;display:grid;gap:12px}
+.newlayout[hidden]{display:none}
+.newlayout label{display:grid;gap:6px;color:var(--muted);font-size:13px}
+.newlayout select,.newlayout input{font:inherit;font-size:15px;color:var(--ink);background:rgba(10,8,30,.45);border:1.5px solid rgba(244,241,255,.2);border-radius:10px;padding:8px 10px}
+.newlayout input:focus-visible,.newlayout select:focus-visible,.newlayout button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
+.newlayout .row{display:flex;gap:10px}
+.newlayout .save{font:inherit;font-weight:700;background:var(--b);color:var(--room-deep);border:0;border-radius:999px;padding:8px 18px;cursor:pointer}
+.newlayout .cancel{font:inherit;background:transparent;color:var(--muted);border:1.5px solid rgba(244,241,255,.2);border-radius:999px;padding:8px 16px;cursor:pointer}
+.newlayout .desc{font-size:13px;color:var(--muted);margin:0}
+.shots{display:flex;gap:10px;margin-top:20px;overflow-x:auto;scrollbar-width:none;max-width:100%}
+.shots::-webkit-scrollbar{display:none}
+.shots button{flex:0 0 auto;width:132px;aspect-ratio:4/3;border:0;padding:0;border-radius:8px;overflow:hidden;cursor:zoom-in;background:#0006;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+.shots button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
+.shots img{width:100%;height:100%;object-fit:cover;display:block}
+.shots-label{color:var(--muted);font-size:13px;margin-top:20px}
+.lightbox{position:fixed;inset:0;z-index:30;background:rgba(10,8,25,.92);display:none;place-items:center;padding:40px}
+.lightbox.on{display:grid}
+.lightbox img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 30px 60px #000a}
+.lightbox p{position:fixed;bottom:18px;left:0;right:0;text-align:center;color:var(--muted);font-size:14px;margin:0}
+@media (prefers-reduced-motion:reduce){body.launching .art{transform:none}.art,.info{transition:opacity .15s}.art.to-left,.art.to-right,.info.to-left,.info.to-right{transform:none}.disc.roll-r svg,.disc.roll-l svg{animation:none}.disc svg,.disc.pop{animation:none}.spine,.disc,.glow{transition:none}}
+@media (max-width:760px){
+  body{overflow:auto}
+  .app{height:auto;min-height:100vh;padding:20px 16px 0}
+  .tools{margin-left:0;width:100%}
+  .search{flex:1;width:auto}
+  .stage{grid-template-columns:1fr;gap:16px}
+  .disc{max-width:260px;margin:0 auto}
+  .plank{margin:0 -16px}
+}
+</style>
+</head>
+<body>
+<div class="glow" aria-hidden="true"></div>
+<video class="bgblur" id="bgblur" muted loop playsinline preload="auto" aria-hidden="true"></video>
+<video class="bgv" id="bgv" loop playsinline preload="auto" aria-hidden="true"></video>
+<iframe class="yt" id="yt" title="Background video" tabindex="-1" aria-hidden="true" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<div class="shade" id="shade" aria-hidden="true"></div>
+<div class="veil" aria-hidden="true"></div>
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Screenshot"><img id="lbimg" alt=""><p>Left and right for more. B or Esc to close.</p></div>
+<div class="app">
+  <header>
+    <h2 class="brand">Game shelf</h2>
+    <span class="count" id="count"></span>
+    <span class="pad" id="pad">Controller connected</span>
+    <button class="chip" id="snd" aria-pressed="true" title="Sound on or off (M)">Sound on</button>
+    <div class="tools">
+      <div role="group" aria-label="Filter by system" id="filters"></div>
+      <input class="search" id="search" type="search" placeholder="Search games" aria-label="Search games" autocomplete="off">
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="art" id="art" aria-hidden="true"><div class="case" id="case" hidden></div><div class="disc" id="disc"></div></div>
+    <div class="info" id="info"></div>
+  </main>
+
+  <div>
+    <div class="spines" id="spines" role="listbox" aria-label="Your games" aria-orientation="horizontal"></div>
+    <div class="plank" aria-hidden="true"></div>
+  </div>
+</div>
+
+<script>
+// Original color sets matched to each game's mood. No official art is used.
+const PALETTES = [
+  [/twilight/i,               {a:'#3b2f5e', b:'#e08a3c', c:'#f3d9b1', pattern:'rays'}],
+  [/zelda/i,                  {a:'#2f6b4f', b:'#d9b44a', c:'#efe6c8', pattern:'rings'}],
+  [/luigi|mansion/i,          {a:'#1d4a57', b:'#9fecd2', c:'#e6fff6', pattern:'dots'}],
+  [/kart|double dash/i,       {a:'#a8242c', b:'#f5c400', c:'#fff4cc', pattern:'checker'}],
+  [/sunshine/i,               {a:'#1a76b5', b:'#ffb347', c:'#fff1dc', pattern:'waves'}],
+  [/resident|evil/i,          {a:'#4a1f22', b:'#c9a46b', c:'#efe2cc', pattern:'rings'}],
+];
+const FALLBACK = [
+  {a:'#4b3f8f', b:'#7fd1ff', c:'#eef6ff', pattern:'rings'},
+  {a:'#6b2f5b', b:'#ff9ec7', c:'#ffe8f2', pattern:'dots'},
+  {a:'#2d5d3a', b:'#b8e86b', c:'#f1fbe1', pattern:'waves'},
+  {a:'#5a3b1e', b:'#ffcf6b', c:'#fff4da', pattern:'rays'},
+  {a:'#1f3f6b', b:'#ff8f6b', c:'#ffeee6', pattern:'checker'},
+];
+const SYSTEM_ORDER = ['GameCube', 'Wii', 'Wii U', 'NES', 'SNES', 'N64', 'Game Boy', 'GBA', 'Genesis', 'PS1', 'PS2', 'PSP', 'Xbox', 'Homebrew'];
+const SHORT = {'GameCube': 'GC', 'Game Boy': 'GB', 'Genesis': 'GEN', 'Wii U': 'WiiU', 'Homebrew': 'HB'};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+let firstPaint = true, games = [], view = [], index = 0, filter = 'All', query = '', busy = false, firstLoad = true;
+
+function paletteFor(title){
+  for (const [re, p] of PALETTES) if (re.test(title)) return p;
+  let h = 0; for (const ch of title) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return FALLBACK[h % FALLBACK.length];
+}
+function sizeText(n){ return n >= 1e9 ? (n/1e9).toFixed(1) + ' GB' : Math.round(n/1e6) + ' MB'; }
+function ago(ts){
+  if (!ts) return 'Not played yet';
+  const m = (Date.now()/1000 - ts) / 60;
+  if (m < 2) return 'Played just now';
+  if (m < 60) return `Played ${Math.round(m)} min ago`;
+  const h = m / 60; if (h < 24) return `Played ${Math.round(h)} hr ago`;
+  const d = h / 24; if (d < 2) return 'Played yesterday';
+  if (d < 30) return `Played ${Math.round(d)} days ago`;
+  return 'Played ' + new Date(ts*1000).toLocaleDateString();
+}
+
+function discSVG(g){
+  const {a, b, c, pattern} = g.pal, id = 'd' + Math.random().toString(36).slice(2, 8);
+  let pat = '';
+  if (pattern === 'rings') {
+    for (let i = 0; i < 9; i++) pat += `<circle cx="200" cy="200" r="${76 + i*15}" fill="none" stroke="${i%2 ? b : c}" stroke-width="6" opacity="${i%2 ? 1 : .45}"/>`;
+    pat += `<rect x="186" y="10" width="28" height="60" rx="6" fill="${c}" opacity=".9"/>`;
+  } else if (pattern === 'rays') {
+    for (let i = 0; i < 24; i++) {
+      const t1 = i*Math.PI/12, t2 = (i+.5)*Math.PI/12;
+      pat += `<path d="M200 200L${200+300*Math.cos(t1)} ${200+300*Math.sin(t1)}L${200+300*Math.cos(t2)} ${200+300*Math.sin(t2)}Z" fill="${i%3 ? b : c}" opacity="${i%3 ? .85 : .6}"/>`;
+    }
+  } else if (pattern === 'checker') {
+    for (let y = 0; y < 400; y += 40) for (let x = 0; x < 400; x += 40)
+      if (((x + y) / 40) % 2 === 0) pat += `<rect x="${x}" y="${y}" width="40" height="40" fill="${c}" opacity=".9"/>`;
+    pat += `<circle cx="200" cy="200" r="120" fill="none" stroke="${b}" stroke-width="26"/>`;
+  } else if (pattern === 'waves') {
+    for (let i = 0; i < 9; i++) {
+      const y = 40 + i*42;
+      pat += `<path d="M-20 ${y} Q 40 ${y-26} 100 ${y} T 220 ${y} T 340 ${y} T 460 ${y}" fill="none" stroke="${i%2 ? b : c}" stroke-width="14" stroke-linecap="round" opacity="${i%2 ? 1 : .55}"/>`;
+    }
+  } else {
+    for (let y = 20; y < 400; y += 34) for (let x = 20 + ((y/34)%2)*17; x < 400; x += 34)
+      pat += `<circle cx="${x}" cy="${y}" r="7" fill="${c}" opacity=".75"/>`;
+    pat += `<circle cx="290" cy="130" r="46" fill="${b}"/>`;
+  }
+  return `<svg viewBox="0 0 400 400">
+    <defs>
+      <mask id="${id}m"><rect width="400" height="400" fill="#fff"/><circle cx="200" cy="200" r="22" fill="#000"/></mask>
+      <clipPath id="${id}c"><circle cx="200" cy="200" r="196"/></clipPath>
+      <radialGradient id="${id}s" cx="28%" cy="22%" r="85%"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    </defs>
+    <g mask="url(#${id}m)">
+      <g clip-path="url(#${id}c)"><rect width="400" height="400" fill="${a}"/>${g.discImg
+        ? `<image href="${g.discImg}" x="0" y="0" width="400" height="400" preserveAspectRatio="xMidYMid slice"/>`
+        : g.cover
+        ? `<image href="${g.cover}" x="0" y="0" width="400" height="400" preserveAspectRatio="xMidYMid slice"/><rect width="400" height="400" fill="${a}" opacity=".12"/>`
+        : pat}</g>
+      <circle cx="200" cy="200" r="196" fill="url(#${id}s)"/>
+      <circle cx="200" cy="200" r="195" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="3"/>
+      ${g.discImg ? '' : `<circle cx="200" cy="200" r="64" fill="#dedcec"/>
+      <circle cx="200" cy="200" r="64" fill="none" stroke="rgba(0,0,0,.18)" stroke-width="2"/>
+      <circle cx="200" cy="200" r="40" fill="none" stroke="rgba(0,0,0,.1)" stroke-width="6"/>`}
+    </g>
+  </svg>`;
+}
+
+function hex(r, g, b){ return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
+function coverPalette(g){
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = c.height = 32;
+        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 32, 32);
+        const d = ctx.getImageData(0, 0, 32, 32).data;
+        let sr = 0, sg = 0, sb = 0, n = 0, best = null, bestScore = -1;
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], gg = d[i+1], b = d[i+2];
+          const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), sat = mx ? (mx - mn) / mx : 0, lum = (r + gg + b) / 3;
+          sr += r; sg += gg; sb += b; n++;
+          const score = sat * (lum > 70 && lum < 235 ? 1 : 0.3);
+          if (score > bestScore) { bestScore = score; best = [r, gg, b]; }
+        }
+        const avg = [sr/n, sg/n, sb/n];
+        const a = hex(avg[0]*.45, avg[1]*.45, avg[2]*.45);
+        const bc = hex(...best);
+        const cc = hex(best[0]*.25 + 255*.75, best[1]*.25 + 255*.75, best[2]*.25 + 255*.75);
+        res({...g.pal, a, b: bc, c: cc});
+      } catch (e) { res(g.pal); }
+    };
+    img.onerror = () => res(g.pal);
+    img.src = g.cover;
+  });
+}
+
+function trimDisc(url){
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const W = 200, H = Math.round(200 * img.height / img.width);
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        const x = c.getContext('2d'); x.drawImage(img, 0, 0, W, H);
+        const d = x.getImageData(0, 0, W, H).data;
+        const px = (i, j) => { const k = (j * W + i) * 4; return [d[k], d[k+1], d[k+2]]; };
+        const corners = [px(1,1), px(W-2,1), px(1,H-2), px(W-2,H-2)];
+        const bg = [0,1,2].map(k => corners.reduce((s, c) => s + c[k], 0) / 4);
+        let x0 = W, y0 = H, x1 = 0, y1 = 0;
+        for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+          const p = px(i, j), diff = Math.abs(p[0]-bg[0]) + Math.abs(p[1]-bg[1]) + Math.abs(p[2]-bg[2]);
+          if (diff > 60) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < y0) y0 = j; if (j > y1) y1 = j; }
+        }
+        let cx, cy, r;
+        if (x1 - x0 > W * 0.3 && y1 - y0 > H * 0.3) { cx = (x0 + x1) / 2; cy = (y0 + y1) / 2; r = Math.max(x1 - x0, y1 - y0) / 2; }
+        else { cx = W / 2; cy = H / 2; r = Math.min(W, H) / 2; }
+        const s = img.width / W, out = document.createElement('canvas'); out.width = out.height = 600;
+        out.getContext('2d').drawImage(img, (cx - r) * s, (cy - r) * s, 2 * r * s, 2 * r * s, 0, 0, 600, 600);
+        res(out.toDataURL('image/jpeg', 0.92));
+      } catch (e) { res(url); }
+    };
+    img.onerror = () => res(null);
+    img.src = url;
+  });
+}
+
+function renderFilters(){
+  const counts = {All: games.length};
+  for (const g of games) counts[g.system] = (counts[g.system] || 0) + 1;
+  const present = Object.keys(counts).filter(k => k !== 'All').sort((a, b) => (SYSTEM_ORDER.indexOf(a) + 99) % 99 - (SYSTEM_ORDER.indexOf(b) + 99) % 99);
+  $('#filters').innerHTML = ['All', ...present]
+    .map(s => `<button class="chip" aria-pressed="${s === filter}" data-f="${s}">${s}</button>`).join(' ');
+  $('#filters').querySelectorAll('.chip').forEach(b => b.onclick = () => { filter = b.dataset.f; apply(); });
+}
+
+function apply(keepFile){
+  const q = query.trim().toLowerCase();
+  view = games.filter(g => (filter === 'All' || g.system === filter) && (!q || g.title.toLowerCase().includes(q)));
+  $('#count').textContent = `${games.length} game${games.length === 1 ? '' : 's'}`;
+  renderFilters();
+  $('#spines').innerHTML = view.map((g, i) =>
+    `<button class="spine ${g.system === 'Wii' ? 'wii' : ''}" role="option" aria-selected="false" data-i="${i}"
+      style="--sa:${g.pal.a};--sb:${g.pal.b};--sc:${g.pal.c}" title="${esc(g.title)}">
+      <span class="t">${esc(g.title)}</span><span class="s">${esc(SHORT[g.system] || g.system)}</span>
+    </button>`).join('');
+  $('#spines').querySelectorAll('.spine').forEach(el => {
+    const i = +el.dataset.i;
+    el.onclick = () => (i === index ? play() : select(i));
+    el.onfocus = () => { if (i !== index) select(i); };
+  });
+  let i = keepFile ? view.findIndex(g => g.file === keepFile) : -1;
+  if (i < 0) i = Math.min(index, Math.max(view.length - 1, 0));
+  const prev = view[i]?.file === keepFile && !firstPaint;
+  index = -1;
+  select(i, !prev);
+  firstPaint = false;
+}
+
+function select(i, instant, dir){
+  if (!view.length) return showEmpty();
+  i = (i + view.length) % view.length;
+  if (!dir) dir = index < 0 || i >= index ? 1 : -1;
+  const changed = i !== index;
+  index = i;
+  const g = view[i], root = document.documentElement.style;
+  root.setProperty('--a', g.pal.a); root.setProperty('--b', g.pal.b); root.setProperty('--c', g.pal.c);
+  $('#spines').querySelectorAll('.spine').forEach((el, j) => {
+    el.setAttribute('aria-selected', j === i);
+    el.tabIndex = j === i ? 0 : -1;
+  });
+  const key = [g.file, g.cover, g.discImg, g.bg, g.yt].join('|');
+  if (changed && key !== paintedKey) { paintedKey = key; swapTo(g, instant, dir); }
+  const sel = $('#spines').children[i];
+  if (sel) sel.scrollIntoView({inline: 'center', block: 'nearest', behavior: instant ? 'auto' : 'smooth'});
+}
+
+let bgTimer, fadeTimer, soundOn = true;
+try { soundOn = localStorage.getItem('shelf-sound') !== 'off'; } catch (e) {}
+const VOL = 0.6;
+function fadeVolume(v, to, ms, done){
+  clearInterval(fadeTimer);
+  const from = v.volume, steps = Math.max(1, Math.round(ms / 30)); let i = 0;
+  fadeTimer = setInterval(() => {
+    i++; v.volume = Math.min(1, Math.max(0, from + (to - from) * i / steps));
+    if (i >= steps) { clearInterval(fadeTimer); done && done(); }
+  }, 30);
+}
+function renderSound(){
+  const b = $('#snd'); if (!b) return;
+  b.textContent = soundOn ? 'Sound on' : 'Sound off';
+  b.setAttribute('aria-pressed', soundOn);
+}
+function toggleSound(){
+  soundOn = !soundOn;
+  try { localStorage.setItem('shelf-sound', soundOn ? 'on' : 'off'); } catch (e) {}
+  renderSound();
+  ytSound();
+  const v = $('#bgv');
+  if (!v.src) return;
+  if (soundOn) { v.muted = false; v.volume = 0; v.play().catch(() => {}); fadeVolume(v, VOL, 500); }
+  else fadeVolume(v, 0, 300, () => { v.muted = true; });
+}
+function startVideo(v){
+  v.muted = !soundOn; v.volume = soundOn ? 0 : VOL;
+  return v.play().catch(e1 => { window.__lastErr = 'unmuted:' + e1.name; v.muted = true; return v.play(); }).then(() => {
+    v.classList.add('on'); $('#shade').classList.add('on');
+    if (!v.muted) fadeVolume(v, VOL, 700);
+  }).catch(e2 => { window.__lastErr = (window.__lastErr || '') + ' muted:' + e2.name; });
+}
+let ytId = null, ytTimer;
+function ytCmd(func, args){
+  const f = $('#yt'); if (!f.src) return;
+  try { f.contentWindow.postMessage(JSON.stringify({event: 'command', func, args: args || []}), '*'); } catch (e) {}
+}
+function ytSound(){ if (soundOn) { ytCmd('unMute'); ytCmd('setVolume', [60]); } else ytCmd('mute'); }
+function setYouTube(id){
+  const f = $('#yt');
+  clearTimeout(ytTimer);
+  if (id === ytId) return;
+  ytId = id;
+  f.classList.remove('on');
+  if (!id) { ytTimer = setTimeout(() => { if (!ytId) f.removeAttribute('src'); }, 900); return; }
+  const qs = new URLSearchParams({autoplay: 1, mute: soundOn ? 0 : 1, controls: 0, loop: 1, playlist: id,
+    modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, disablekb: 1, fs: 0, enablejsapi: 1, origin: location.origin});
+  ytTimer = setTimeout(() => {
+    f.src = `https://www.youtube.com/embed/${id}?${qs}`;
+    f.onload = () => {
+      setTimeout(() => { ytSound(); f.classList.add('on'); $('#shade').classList.add('on'); }, 600);
+    };
+  }, 250);
+}
+
+function setBackground(src){
+  const v = $('#bgv'), sh = $('#shade');
+  clearTimeout(bgTimer);
+  const leave = cb => { if (v.src && !v.muted && !v.paused) fadeVolume(v, 0, 250, cb); else cb(); };
+  if (!src) {
+    v.classList.remove('on'); if (!ytId) sh.classList.remove('on');
+    leave(() => { bgTimer = setTimeout(() => { v.pause(); v.removeAttribute('src'); v.load(); }, 600); });
+    return;
+  }
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  v.classList.remove('on');
+  leave(() => { bgTimer = setTimeout(() => { v.src = src; v.oncanplay = () => { if (v.paused) startVideo(v); }; v.load(); startVideo(v); }, 150); });
+}
+
+let swapTimer, paintedKey = '';
+function infoHTML(g){
+  const resume = g.resume ? `<button class="resume" id="resume"><span class="btn-x">X</span>Resume <small>saved ${ago(g.resume.time).replace('Played ', '').replace('Not played yet', '')}</small></button>` : '';
+  return `
+    <h1>${esc(g.title)}</h1>
+    <div class="meta"><span class="tag">${esc(g.system)}</span><span>${sizeText(g.size)} ${esc(g.format)}</span><span>${ago(g.lastPlayed)}</span></div>
+    <div class="actions"><button class="play" id="play"><span class="btn-a">A</span>Play</button>${resume}</div>
+    <div class="status" id="status" role="status"></div>
+    <label class="ctl" ${g.profileKind ? '' : 'hidden'}>Controller <select id="prof" aria-label="Controller layout for this game"><option value="">Dolphin default</option></select></label>
+    <form class="newlayout" id="newlayout" hidden>
+      <label>Start from
+        <select id="nlpreset">
+          <option value="standard">Xbox, GameCube positions (A, B, X, Y where you'd expect)</option>
+          <option value="kart">Mario Kart: drift on RT or RB</option>
+          <option value="kart_rt">Mario Kart: gas on RT, drift on RB</option>
+          <option value="current">Copy my current Dolphin controls</option>
+        </select>
+      </label>
+      <p class="desc" id="nldesc"></p>
+      <label>Name <input id="nlname" maxlength="40" autocomplete="off" placeholder="e.g. ${esc(g.title.split(' - ')[0])}"></label>
+      <div class="row"><button class="save" type="submit">Save layout</button><button class="cancel" type="button" id="nlcancel">Cancel</button></div>
+    </form>
+    <div id="shotbox"></div>
+    <div class="hint">Left and right to browse. A to play${g.resume ? ', X to resume' : ''}. LB and RB switch systems. Y or M toggles sound.</div>`;
+}
+const profCache = {};
+const PRESET_DESC = {
+  standard: 'Xbox A = GameCube A, X = B, B = X, Y = Y, RB = Z, triggers = L and R. Works well for most games.',
+  kart: 'Same as standard, and RB also drifts, so you can hop with either the trigger or the bumper.',
+  kart_rt: 'RT is the gas pedal (A still works too), RB drifts, LB swaps characters.',
+  current: 'Saves exactly what you have set up in Dolphin’s Controllers window right now.'
+};
+async function fillProfiles(g, force){
+  const sel = $('#prof'); if (!sel) return;
+  try {
+    if (force || !profCache[g.profileKind]) profCache[g.profileKind] = (await (await fetch('/api/profiles?kind=' + g.profileKind)).json()).profiles || [];
+  } catch (e) { profCache[g.profileKind] = []; }
+  if (view[index] !== g) return;
+  const list = profCache[g.profileKind].slice();
+  if (g.profile && !list.includes(g.profile)) list.push(g.profile);
+  const canNew = g.system !== 'Wii';
+  sel.innerHTML = `<option value="">${list.length ? 'Dolphin default' : 'Dolphin default (no saved layouts yet)'}</option>`
+    + list.map(n => `<option ${n === g.profile ? 'selected' : ''}>${esc(n)}</option>`).join('')
+    + (canNew ? '<option value="__new">+ New layout…</option>' : '');
+  const form = $('#newlayout'), preset = $('#nlpreset'), desc = $('#nldesc'), name = $('#nlname');
+  const showDesc = () => { desc.textContent = PRESET_DESC[preset.value] || ''; };
+  preset.onchange = showDesc; showDesc();
+  const closeForm = () => { form.hidden = true; sel.value = g.profile || ''; };
+  $('#nlcancel').onclick = closeForm;
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    const nm = name.value.trim(); if (!nm) { name.focus(); return; }
+    try {
+      const r = await fetch('/api/profile/new', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({file: g.file, name: nm, preset: preset.value})});
+      const d = await r.json(); if (!r.ok) throw new Error(d.error);
+      g.profile = d.profile; form.hidden = true; name.value = '';
+      await fillProfiles(g, true);
+      showStatus(`Saved “${d.profile}” and set it for ${g.title}`);
+    } catch (e) { showStatus(e.message || "Couldn't save that layout.", true); }
+  };
+  sel.onchange = async () => {
+    if (sel.value === '__new') { form.hidden = false; name.focus(); return; }
+    form.hidden = true;
+    try {
+      const r = await fetch('/api/profile', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({file: g.file, profile: sel.value})});
+      const d = await r.json(); if (!r.ok) throw new Error(d.error);
+      g.profile = d.profile; showStatus(sel.value ? `${g.title} will use “${sel.value}”` : `${g.title} will use Dolphin's default controls`);
+    } catch (e) { showStatus(e.message || "Couldn't save that.", true); }
+  };
+}
+let shotList = [], shotAt = 0;
+async function fillShots(g){
+  const box = $('#shotbox'); if (!box) return;
+  if (!g.shots) { box.innerHTML = ''; return; }
+  let shots = [];
+  try { shots = (await (await fetch('/api/shots?file=' + encodeURIComponent(g.file))).json()).shots || []; } catch (e) {}
+  if (view[index] !== g || !shots.length) return;
+  box.innerHTML = `<div class="shots-label">Your screenshots</div><div class="shots">${shots.map((x, i) => `<button data-i="${i}" aria-label="Open screenshot ${i + 1}"><img src="${x.url}" alt="" loading="lazy"></button>`).join('')}</div>`;
+  box.querySelectorAll('button').forEach(b => b.onclick = () => openShot(shots, +b.dataset.i));
+}
+function openShot(list, i){ shotList = list; shotAt = (i + list.length) % list.length; $('#lbimg').src = list[shotAt].url; $('#lightbox').classList.add('on'); }
+function closeShot(){ $('#lightbox').classList.remove('on'); }
+const shotOpen = () => $('#lightbox').classList.contains('on');
+$('#lightbox').onclick = closeShot;
+function paint(g){
+  const disc = $('#disc'), cs = $('#case'), art = $('#art');
+  disc.innerHTML = discSVG(g);
+  disc.classList.toggle('mini', g.system !== 'Wii');
+  art.classList.toggle('has-cover', !!g.cover);
+  cs.hidden = !g.cover;
+  cs.innerHTML = g.cover ? `<img src="${g.cover}" alt="">` : '';
+  $('#info').innerHTML = infoHTML(g);
+  $('#play').onclick = () => play(false);
+  const rb = $('#resume'); if (rb) rb.onclick = () => play(true);
+  fillProfiles(g); fillShots(g);
+}
+function swapTo(g, instant, dir){
+  clearTimeout(swapTimer);
+  if (g.yt) { setBackground(null); setYouTube(g.yt); }
+  else { setYouTube(null); setBackground(g.bg); }
+  const art = $('#art'), info = $('#info');
+  const out = dir > 0 ? 'to-left' : 'to-right', inn = dir > 0 ? 'to-right' : 'to-left';
+  const clear = el => el.classList.remove('to-left', 'to-right', 'snap');
+  if (instant || !art.innerHTML.trim()) { clear(art); clear(info); paint(g); return; }
+  [art, info].forEach(el => { el.classList.remove('snap', 'to-left', 'to-right'); el.classList.add(out); });
+  swapTimer = setTimeout(() => {
+    paint(g);
+    const disc = $('#disc');
+    disc.classList.remove('roll-l', 'roll-r'); disc.classList.add(dir > 0 ? 'roll-r' : 'roll-l');
+    [art, info].forEach(el => { el.classList.add('snap'); el.classList.remove(out); el.classList.add(inn); });
+    void art.offsetWidth;
+    requestAnimationFrame(() => [art, info].forEach(el => { el.classList.remove('snap', inn); }));
+  }, 190);
+}
+function preload(){
+  for (const g of games) for (const src of [g.cover, g.discImg]) if (src) { const i = new Image(); i.src = src; }
+}
+
+function showEmpty(){
+  paintedKey = ''; setYouTube(null); $('#disc').innerHTML = ''; $('#case').hidden = true; setBackground(null);
+  $('#spines').innerHTML = '';
+  const searching = query || filter !== 'All';
+  $('#info').innerHTML = `<div class="empty">
+    <h1>${searching ? 'No matches' : 'Your shelf is empty'}</h1>
+    <p class="hint">${searching ? 'Clear the search or pick All to see every game.'
+      : 'Put GameCube and Wii games in your Dolphin Games folder, and other systems in their folders (NES, SNES, N64, PS1, PS2, PSP, Xbox and so on), then press R.'}</p></div>`;
+}
+
+function showStatus(msg, err){ const s = $('#status'); if (s) { s.textContent = msg; s.classList.toggle('err', !!err); } }
+
+async function load(){
+  const keep = view[index]?.file;
+  try {
+    const r = await fetch('/api/games', {cache: 'no-store'});
+    const d = await r.json();
+    games = d.games.map(g => ({...g, pal: paletteFor(g.title)}));
+    await Promise.all(games.filter(g => g.cover).map(async g => { g.pal = await coverPalette(g); }));
+    await Promise.all(games.filter(g => g.disc).map(async g => { g.discImg = await trimDisc(g.disc); }));
+    preload();
+  } catch (e) {
+    games = []; view = []; showEmpty();
+    $('#info').innerHTML = `<h1>Shelf is offline</h1><p class="hint">Quit Game Shelf and open it again.</p><p class="hint" id="errdetail">${esc((e && e.name) + ": " + (e && e.message) + " | " + (e && e.stack))}</p>`;
+    return;
+  }
+  let startFile = keep;
+  if (firstLoad) {
+    const recent = [...games].sort((x, y) => (y.lastPlayed || 0) - (x.lastPlayed || 0))[0];
+    startFile = recent?.lastPlayed ? recent.file : games[0]?.file;
+    firstLoad = false;
+  }
+  apply(startFile);
+}
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+let launched = false;
+async function play(resume){
+  const g = view[index]; if (!g || busy) return;
+  if (resume && !g.resume) return;
+  busy = true; const btn = $('#play'); if (btn) btn.disabled = true;
+  document.body.classList.remove('returning');
+  document.body.classList.add('launching');
+  const bv = $('#bgv'); if (bv.src && !bv.muted) fadeVolume(bv, 0, 900, () => bv.pause());
+  ytCmd('pauseVideo');
+  await wait(1100);
+  try {
+    const r = await fetch('/api/launch', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({file: g.file, resume: !!resume})});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Dolphin didn't start.");
+    g.lastPlayed = d.lastPlayed; g.plays = d.plays;
+    launched = true;
+    setTimeout(() => { if (launched && document.hasFocus()) comeBack(); }, 8000);
+  } catch (e) {
+    comeBack();
+    showStatus(e.message || "Dolphin didn't start.", true);
+  } finally {
+    busy = false; const b = $('#play'); if (b) b.disabled = false;
+  }
+}
+function comeBack(){
+  launched = false;
+  document.body.classList.add('returning');
+  document.body.classList.remove('launching');
+  const meta = $('#info .meta span:last-child'), g = view[index];
+  if (meta && g) meta.textContent = ago(g.lastPlayed);
+  setTimeout(() => document.body.classList.remove('returning'), 700);
+}
+
+function move(dir){
+  if (!view.length) return;
+  const focusSpine = document.activeElement?.classList?.contains('spine');
+  select(index + dir, false, dir);
+  if (focusSpine) $('#spines').children[index]?.focus();
+}
+function cycleFilter(dir){
+  const avail = [...$('#filters').querySelectorAll('.chip')].map(b => b.dataset.f);
+  filter = avail[(avail.indexOf(filter) + dir + avail.length) % avail.length];
+  index = 0; apply();
+}
+
+$('#search').addEventListener('input', e => { query = e.target.value; index = 0; apply(); });
+document.addEventListener('keydown', e => {
+  if (e.target === $('#search')) {
+    if (e.key === 'Escape') { e.target.value = ''; query = ''; apply(); e.target.blur(); }
+    else if (e.key === 'Enter' || e.key === 'ArrowDown') e.target.blur();
+    return;
+  }
+  if (shotOpen()) {
+    if (e.key === 'Escape' || e.key === 'Backspace') closeShot();
+    else if (e.key === 'ArrowLeft') openShot(shotList, shotAt - 1);
+    else if (e.key === 'ArrowRight') openShot(shotList, shotAt + 1);
+    e.preventDefault(); return;
+  }
+  if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement) return;
+  if (e.key === 'ArrowLeft') { move(-1); e.preventDefault(); }
+  else if (e.key === 'ArrowRight') { move(1); e.preventDefault(); }
+  else if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) play(false);
+  else if (e.key.toLowerCase() === 'c' && !e.metaKey) play(true);
+  else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
+  else if (e.key.toLowerCase() === 'm' && !e.metaKey) toggleSound();
+  else if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey) load();
+});
+
+// Xbox controller support through the browser's Gamepad API.
+const held = {}; let repeatAt = 0, wasDir = false;
+function edge(gp, i, fn){ const p = !!gp.buttons[i]?.pressed; if (p && !held[i]) fn(); held[i] = p; }
+function pollPad(){
+  requestAnimationFrame(pollPad);
+  if (!document.hasFocus()) return;
+  const gp = [...(navigator.getGamepads?.() || [])].find(Boolean); if (!gp) return;
+  if (shotOpen()) { edge(gp, 1, closeShot); edge(gp, 14, () => openShot(shotList, shotAt - 1)); edge(gp, 15, () => openShot(shotList, shotAt + 1)); return; }
+  const now = performance.now(), x = gp.axes[0] || 0;
+  const left = gp.buttons[14]?.pressed || x < -0.55, right = gp.buttons[15]?.pressed || x > 0.55;
+  if (left || right) {
+    if (now >= repeatAt) { move(left ? -1 : 1); repeatAt = now + (wasDir ? 150 : 360); wasDir = true; }
+  } else { wasDir = false; repeatAt = 0; }
+  const nl = $('#newlayout'); if (nl && !nl.hidden) return;
+  edge(gp, 0, () => play(false));
+  edge(gp, 2, () => play(true));
+  edge(gp, 4, () => cycleFilter(-1));
+  edge(gp, 5, () => cycleFilter(1));
+  edge(gp, 3, toggleSound);
+}
+addEventListener('gamepadconnected', () => $('#pad').classList.add('on'));
+addEventListener('gamepaddisconnected', () => { if (![...(navigator.getGamepads?.() || [])].some(Boolean)) $('#pad').classList.remove('on'); });
+requestAnimationFrame(pollPad);
+$('#snd').onclick = toggleSound; renderSound();
+addEventListener('focus', () => { document.body.classList.remove('ingame'); if (launched) comeBack(); if (!busy) load(); const v = $('#bgv'); if (v.src && v.paused) startVideo(v); if (ytId) { ytCmd('playVideo'); ytSound(); } });
+addEventListener('blur', () => { $('#bgv').pause(); ytCmd('pauseVideo'); document.body.classList.add('ingame'); });
+
+const ping = () => fetch('/api/ping', {cache: 'no-store'}).catch(() => {});
+ping(); setInterval(ping, 30000);
+setInterval(() => {
+  const g = view[index], v = $('#bgv'), b = document.body.classList;
+  if (!g || !g.bg || g.yt || b.contains('launching') || b.contains('ingame') || busy) return;
+  const want = new URL(g.bg, location.href).href;
+  if (v.src !== want) setBackground(g.bg);
+  else if (v.paused || !v.classList.contains('on')) startVideo(v);
+}, 1500);
+// Blurred copy fills the edges so the video doesn't need to be zoomed in
+setInterval(() => {
+  const v = $('#bgv'), b = $('#bgblur');
+  const src = v.getAttribute('src');
+  if ((b.getAttribute('src') || null) !== (src || null)) { if (src) b.src = src; else { b.removeAttribute('src'); b.load(); } }
+  b.classList.toggle('on', v.classList.contains('on'));
+  if (!src) return;
+  if (v.paused && !b.paused) b.pause();
+  else if (!v.paused) { if (b.paused) b.play().catch(() => {}); if (Math.abs(b.currentTime - v.currentTime) > 0.3) b.currentTime = v.currentTime; }
+}, 400);
+const unlock = () => { const v = $('#bgv'); if (!v.src || document.body.classList.contains('launching')) return; if (v.paused) startVideo(v); else if (soundOn && v.muted) { v.muted = false; v.volume = 0; fadeVolume(v, VOL, 500); } };
+addEventListener('pointerdown', unlock); addEventListener('keydown', unlock);
+load();
+</script>
+</body>
+</html>

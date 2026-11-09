@@ -1,0 +1,46 @@
+# Your own media and play data stay on your Mac
+Game Shelf/covers/
+Game Shelf/discs/
+Game Shelf/backgrounds/
+Game Shelf/recordings/
+Game Shelf/state.json
+Game Shelf/*.log
+Game Shelf/*.backup*
+Game Shelf/.*.jpg
+Game Shelf/.*.png
+__pycache__/
+
+# Built on first launch
+Game Shelf.app/Contents/MacOS/ShelfWindow
+Game Shelf.app/Contents/MacOS/ShelfWindow.tmp
+
+# Games, emulators and console files never go in the repo
+*.iso
+*.ciso
+*.gcz
+*.rvz
+*.wbfs
+*.wia
+*.gcm
+*.chd
+*.cso
+*.wua
+*.wux
+*.wud
+*.z64
+*.n64
+*.v64
+*.nes
+*.sfc
+*.smc
+*.gb
+*.gbc
+*.gba
+*.bin
+*.cue
+*.wav
+*.mov
+*.mp4
+Emulators/
+
+.DS_Store
